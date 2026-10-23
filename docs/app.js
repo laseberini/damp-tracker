@@ -155,40 +155,48 @@ function areaView(id) {
   };
 }
 
-// ---------- Trend table: rounds × markers ----------
+// ---------- Trend table: one row per marker, one column per round (oldest → newest) ----------
 
 function tableView(id) {
   const a = area(id);
   if (!a) return null;
   const ms = markersOf(id);
-  const rows = roundsOf(id).reverse().map((r) => {
-    let up = 0, down = 0;
-    const cells = ms.map((m) => {
+  const rounds = roundsOf(id);
+  const up = rounds.map(() => 0), down = rounds.map(() => 0);
+
+  const rows = ms.map((m) => {
+    let prev = null; // this marker's value in the nearest column to the left
+    const cells = rounds.map((r, k) => {
       const v = r.values[m.id];
       if (v == null) return '<td class="blank">·</td>';
-      const p = previous(m.id, r)?.value;
-      const d = p == null ? null : Math.round((v - p) * 10) / 10;
-      if (d > 0) up++;
-      if (d < 0) down++;
+      const d = prev == null ? null : Math.round((v - prev) * 10) / 10;
+      prev = v;
+      if (d > 0) up[k]++;
+      if (d < 0) down[k]++;
       const arrow = d == null ? '' : d > 0 ? '▲' : d < 0 ? '▼' : '=';
       return `<td><span class="cell ${level(v)}">${fmtVal(v)}<small class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${arrow}</small></span></td>`;
     });
-    return `<tr data-r="${r.id}">
-      <th><div>${fmtDateTime(r.at)}</div>${r.note ? `<div class="tag">${esc(r.note)}</div>` : ''}
-        ${up || down ? `<div class="sum"><span class="up">▲${up}</span> <span class="down">▼${down}</span></div>` : ''}</th>
-      ${cells.join('')}</tr>`;
+    return `<tr><th class="mk"><a href="#/m/${m.id}"><span class="num">${m.num}</span><span class="nm">${m.name ? esc(m.name) : ''}</span></a></th>${cells.join('')}</tr>`;
   });
+  const heads = rounds.map(
+    (r) => `<th class="rh" data-r="${r.id}"><div>${fmtDate(r.at)}</div><div class="muted">${r.at.slice(11, 16)}</div>${r.note ? `<span class="tag">${esc(r.note)}</span>` : ''}</th>`,
+  );
+  const sums = rounds.map((_, k) => (k === 0 ? '<td></td>' : `<td><span class="up">▲${up[k]}</span> <span class="down">▼${down[k]}</span></td>`));
+
   return {
     title: `${a.name} · Trend`,
     back: `/a/${id}`,
     html: `
-      <p class="muted small">Newest round on top. <span class="trend up">▲</span> wetter / <span class="trend down">▼</span> drier than that marker's previous reading. Tap a row to open the round.</p>
-      <div class="table-scroll"><table class="matrix">
-        <thead><tr><th>Round</th>${ms.map((m) => `<th>${m.num}</th>`).join('')}</tr></thead>
+      <p class="muted small">Oldest round on the left, newest on the right. <span class="trend up">▲</span> wetter / <span class="trend down">▼</span> drier than the round before. Tap a date to open that round, or a marker to see its chart.</p>
+      <div class="table-scroll" id="ts"><table class="matrix">
+        <thead><tr><th class="mk">Marker</th>${heads.join('')}</tr></thead>
         <tbody>${rows.join('')}</tbody>
+        <tfoot><tr class="sumrow"><th class="mk">Change</th>${sums.join('')}</tr></tfoot>
       </table></div>`,
     mount(root) {
-      root.querySelectorAll('tr[data-r]').forEach((tr) => tr.addEventListener('click', () => go(`/r/${tr.dataset.r}/done`)));
+      root.querySelectorAll('th[data-r]').forEach((th) => th.addEventListener('click', () => go(`/r/${th.dataset.r}/done`)));
+      const ts = root.querySelector('#ts');
+      ts.scrollLeft = ts.scrollWidth; // open on the newest rounds
     },
   };
 }

@@ -1,0 +1,34 @@
+# Damp Tracker
+
+A phone app (PWA) for logging moisture meter readings while you hunt for a leak.
+Everything is stored **on the phone** (IndexedDB). There is no server, account or sync.
+
+## How it works
+
+- **Area** (e.g. Stairwell) → numbered **markers**, each with an optional photo. Several markers can share one photo.
+- **New round**: pick the date/time and what you're testing ("pipe hose test"), then enter each marker's value on the big keypad.
+  **Swipe left/right** (or Save / Skip / Back) to move between markers. A swipe also saves what you typed.
+- **▲ wetter / ▼ drier** compares each value with that marker's previous reading.
+- **Trend table**: every round (newest first) × every marker, coloured, with arrows and a ▲/▼ count per round,
+  so you can see what each experiment did.
+- **Marker page**: chart over time with experiment notes marked, plus history. Swipe to the next marker.
+  Tap a photo for full screen: pinch or double-tap to zoom, swipe between photos.
+- Colours (meter in WALL mode): green under 8%, yellow 8–11.9%, red 12%+. You can change these in ⚙ Settings.
+
+## Backups
+
+Data lives only in the phone's browser, so use **⚙ → Save backup file** now and then and keep the file somewhere safe
+(Google Drive, iCloud, email). **Restore from backup file** puts everything back, photos included, on this phone or a new one.
+**Export readings as CSV** gives a spreadsheet.
+
+Add the app to your home screen. That also tells the browser to keep its data.
+
+## Files
+
+`docs/` is the whole app (plain HTML/CSS/JS, no build step), ready for GitHub Pages ("Deploy from branch → /docs").
+
+```bash
+node scripts/serve.mjs   # try it locally on http://localhost:8080
+```
+
+`Source images/` (your house photos) is git-ignored so it never gets published.

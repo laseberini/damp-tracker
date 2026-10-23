@@ -1,0 +1,7 @@
+# Personal photos of the house: never publish these.
+Source images/
+node_modules/
+.wrangler/
+
+# Local tooling
+.claude/

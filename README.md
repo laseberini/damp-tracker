@@ -32,3 +32,11 @@ node scripts/serve.mjs   # try it locally on http://localhost:8080
 ```
 
 `Source images/` (your house photos) is git-ignored so it never gets published.
+
+## Releasing a change
+
+1. Bump `const VERSION = 'vX.Y'` at the top of `docs/app.js` (it shows at the bottom of the home screen).
+2. Push to `main`. GitHub Pages republishes in about a minute.
+3. The app checks the live version whenever it opens or comes back to the front, skipping all caches, and reloads itself.
+   If you're mid-round or editing, it shows a "New version ready" bar instead, so nothing typed is lost.
+   Tap the version number to check by hand.

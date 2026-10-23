@@ -104,6 +104,13 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .gear { font-size: 24px; }
 .back:active, .gear:active { background: rgb(255 255 255 / 0.15); }
 
+#update {
+  position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 9; display: block; width: 100%;
+  min-height: 52px; border: 0; background: var(--damp); color: #241a00; font-weight: 700; font-size: 16px;
+}
+#update[hidden] { display: none; }
+.version { display: block; width: 100%; min-height: 44px; margin-top: 28px; border: 0; background: none; color: var(--muted); font-size: 13px; }
+
 main { max-width: 680px; margin: 0 auto; padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); }
 main.slide-left { animation: in-left 0.2s ease-out; }
 main.slide-right { animation: in-right 0.2s ease-out; }

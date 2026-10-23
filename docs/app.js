@@ -5,6 +5,9 @@ import {
 import { esc, nowLocal, fmtDate, fmtDateTime, fmtVal, badge, trend, levelWord, toast, swipe, openViewer, resizeImage } from './ui.js';
 import { drawChart } from './chart.js';
 
+// Bump on every change you push. The app compares this with the live copy to update itself.
+const VERSION = 'v1.2';
+
 const app = document.getElementById('app');
 const titleEl = document.getElementById('title');
 const backBtn = document.getElementById('back');
@@ -100,9 +103,49 @@ function homeView() {
     html: `
       ${nudge}
       ${cards.join('') || '<div class="empty-state">Start by adding an area, e.g. <b>Stairwell</b>. Then add its numbered markers.</div>'}
-      <a class="btn ${S.areas.length ? '' : 'primary big'}" href="#/a/new">+ Add area</a>`,
+      <a class="btn ${S.areas.length ? '' : 'primary big'}" href="#/a/new">+ Add area</a>
+      ${versionButton()}`,
+    mount: mountVersionButton,
   };
 }
+
+// ---------- Version & updates ----------
+
+const versionButton = () => `<button class="version" data-act="version">Damp Tracker ${VERSION} · tap to check for updates</button>`;
+function mountVersionButton(root) {
+  root.querySelector('[data-act=version]').onclick = () => checkForUpdate(true);
+}
+
+// Screens where a surprise reload could lose something being typed.
+const isBusy = () => /^\/(r\/|settings|a\/new|a\/[^/]+\/(edit|m\/new)|m\/[^/]+\/edit)/.test(decodeURI(location.hash.slice(1)));
+
+// Installed apps have no refresh button, so on open and whenever the app comes back to the
+// front, read VERSION from the live app.js (skipping every cache) and reload if it's newer.
+async function checkForUpdate(manual = false) {
+  let latest;
+  try {
+    const src = await (await fetch(`app.js?check=${Date.now()}`, { cache: 'no-store' })).text();
+    latest = src.match(/const VERSION = '([^']+)'/)?.[1];
+  } catch {
+    if (manual) toast('No connection, so I can’t check for updates', 'error');
+    return;
+  }
+  if (!latest || latest === VERSION) {
+    if (manual) toast(`You have the latest version (${VERSION})`);
+    return;
+  }
+  // Reload once per new version. If the old copy comes back anyway, offer a button instead of looping.
+  if (manual || (!isBusy() && sessionStorage.getItem('updatedTo') !== latest)) {
+    sessionStorage.setItem('updatedTo', latest);
+    location.reload();
+    return;
+  }
+  const bar = document.getElementById('update');
+  bar.textContent = `New version ${latest} ready. Tap to update`;
+  bar.hidden = false;
+  bar.onclick = () => location.reload();
+}
+document.addEventListener('visibilitychange', () => document.hidden || checkForUpdate());
 
 // ---------- Area ----------
 
@@ -694,8 +737,10 @@ function settingsView() {
       <form id="addnote" class="inline-form">
         <input name="note" maxlength="80" placeholder="e.g. gutter cleared" required>
         <button class="btn">Add</button>
-      </form>`,
+      </form>
+      ${versionButton()}`,
     async mount(root) {
+      mountVersionButton(root);
       const thr = root.querySelector('#thr');
       const legend = () => {
         const y = Number(thr.yellow.value), r = Number(thr.red.value);
@@ -806,5 +851,6 @@ async function shareOrDownload(file) {
   }
   persist();
   render();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+  checkForUpdate();
 })();

@@ -166,7 +166,9 @@ export async function backupFile() {
   for (let i = 0; i < keys.length; i++) photos[keys[i]] = await toDataUrl(blobs[i]);
   const data = { app: 'damp-tracker', version: 1, exportedAt: new Date().toISOString(), state: S, photos };
   const day = new Date().toISOString().slice(0, 10);
-  return new File([JSON.stringify(data)], `damp-tracker-backup-${day}.json`, { type: 'application/json' });
+  // JSON inside, but saved as .txt: Chrome on Android refuses to share .json files,
+  // and sharing is how the backup gets to Google Drive.
+  return new File([JSON.stringify(data)], `damp-tracker-backup-${day}.txt`, { type: 'text/plain' });
 }
 
 // Replaces everything on this device with the contents of a backup file.

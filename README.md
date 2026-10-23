@@ -17,8 +17,9 @@ Everything is stored **on the phone** (IndexedDB). There is no server, account o
 
 ## Backups
 
-Data lives only in the phone's browser, so use **⚙ → Save backup file** now and then and keep the file somewhere safe
-(Google Drive, iCloud, email). **Restore from backup file** puts everything back, photos included, on this phone or a new one.
+Data lives only in the phone's browser, so use **⚙ → Save backup to Drive…** now and then and pick **Drive** in the share menu.
+The backup is a `.txt` file (JSON inside), because Chrome on Android won't share `.json` files.
+**Restore from backup file** (pick it from Drive in the file picker) puts everything back, photos included, on this phone or a new one.
 **Export readings as CSV** gives a spreadsheet.
 
 Add the app to your home screen. That also tells the browser to keep its data.

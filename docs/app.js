@@ -6,7 +6,7 @@ import { esc, nowLocal, fmtDate, fmtDateTime, fmtVal, badge, trend, levelWord, t
 import { drawChart } from './chart.js';
 
 // Bump on every change you push. The app compares this with the live copy to update itself.
-const VERSION = 'v1.3';
+const VERSION = 'v1.4';
 
 const app = document.getElementById('app');
 const titleEl = document.getElementById('title');
@@ -677,10 +677,11 @@ function settingsView() {
     back: '/',
     html: `
       <h2>Backup</h2>
-      <p class="small">Your readings and photos are stored <b>only on this phone</b>. Save a backup now and then and keep it in Google Drive, iCloud or email. ${st.lastBackup ? `Last backup: <b>${fmtDateTime(st.lastBackup)}</b>.` : '<b>No backup yet.</b>'}</p>
+      <p class="small">Your readings and photos are stored <b>only on this phone</b>. Save a backup now and then: tap <b>Save backup to Drive</b>, then pick <b>Drive</b> in the menu that opens. ${st.lastBackup ? `Last backup: <b>${fmtDateTime(st.lastBackup)}</b>.` : '<b>No backup yet.</b>'}</p>
       <div class="stack">
-        <button class="btn primary" data-act="backup">Save backup file</button>
-        <label class="btn">Restore from backup file<input type="file" accept=".json,application/json" hidden data-act="restore"></label>
+        <button class="btn primary" data-act="backup">Save backup to Drive…</button>
+        <label class="btn">Restore from backup file<input type="file" accept=".txt,.json,text/plain,application/json" hidden data-act="restore"></label>
+        <p class="muted small">To restore, pick the backup file from Drive in the file picker (tap ☰ → Drive). Restoring replaces everything on this phone.</p>
         <button class="btn" data-act="csv">Export readings as CSV</button>
       </div>
       <p class="muted small" id="storage"></p>
@@ -734,13 +735,31 @@ function settingsView() {
         await save();
         render();
       });
-      root.querySelector('[data-act=backup]').onclick = async () => {
-        if (await shareOrDownload(await backupFile())) {
-          st.lastBackup = new Date().toISOString();
-          await save();
-          render();
-          toast('Backup saved');
+      const backupBtn = root.querySelector('[data-act=backup]');
+      let ready = null; // built backup, kept in case the share needs a second tap
+      backupBtn.onclick = async () => {
+        if (!ready) {
+          backupBtn.disabled = true;
+          backupBtn.textContent = 'Preparing backup…';
+          try {
+            ready = await backupFile();
+          } finally {
+            backupBtn.disabled = false;
+          }
         }
+        const result = await shareOrDownload(ready);
+        if (result === 'retry') {
+          // Building it took too long for the phone to allow sharing from that tap.
+          backupBtn.textContent = 'Backup ready. Tap to save to Drive';
+          return;
+        }
+        backupBtn.textContent = 'Save backup to Drive…';
+        ready = null;
+        if (!result) return;
+        st.lastBackup = new Date().toISOString();
+        await save();
+        render();
+        toast(result === 'downloaded' ? 'Backup saved to Downloads' : 'Backup saved');
       };
       root.querySelector('[data-act=restore]').addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -754,7 +773,9 @@ function settingsView() {
           toast(err.message, 'error');
         }
       });
-      root.querySelector('[data-act=csv]').onclick = () => shareOrDownload(csvFile());
+      root.querySelector('[data-act=csv]').onclick = async () => {
+        if ((await shareOrDownload(csvFile())) === 'downloaded') toast('CSV saved to Downloads');
+      };
 
       const est = await navigator.storage?.estimate?.().catch(() => null);
       const kept = await persist();
@@ -783,14 +804,16 @@ function csvFile() {
   return new File(['﻿' + lines.join('\r\n')], `damp-readings-${nowLocal().slice(0, 10)}.csv`, { type: 'text/csv' });
 }
 
-// On a phone, open the share sheet (Save to Files, Drive, email…); otherwise download.
+// On a phone, open the share sheet (Drive, email…); otherwise download.
+// Returns 'shared', 'downloaded', false (cancelled) or 'retry' (needs a fresh tap).
 async function shareOrDownload(file) {
   if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: file.name });
-      return true;
+      return 'shared';
     } catch (e) {
       if (e.name === 'AbortError') return false;
+      if (e.name === 'NotAllowedError') return 'retry';
     }
   }
   const link = document.createElement('a');
@@ -800,7 +823,7 @@ async function shareOrDownload(file) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-  return true;
+  return 'downloaded';
 }
 
 // ---------- Boot ----------

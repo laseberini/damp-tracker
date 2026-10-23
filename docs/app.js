@@ -6,7 +6,7 @@ import { esc, nowLocal, fmtDate, fmtDateTime, fmtVal, badge, trend, levelWord, t
 import { drawChart } from './chart.js';
 
 // Bump on every change you push. The app compares this with the live copy to update itself.
-const VERSION = 'v1.2';
+const VERSION = 'v1.3';
 
 const app = document.getElementById('app');
 const titleEl = document.getElementById('title');
@@ -32,7 +32,7 @@ const routes = [
   [/^\/a\/new$/, () => areaEditView(null)],
   [/^\/a\/([^/]+)$/, areaView],
   [/^\/a\/([^/]+)\/edit$/, areaEditView],
-  [/^\/a\/([^/]+)\/table$/, tableView],
+  [/^\/a\/([^/]+)\/table$/, areaView], // old link: the table is the area page now
   [/^\/a\/([^/]+)\/m\/new$/, (areaId) => markerEditView(null, areaId)],
   [/^\/m\/([^/]+)$/, markerView],
   [/^\/m\/([^/]+)\/edit$/, (id) => markerEditView(id)],
@@ -147,60 +147,9 @@ async function checkForUpdate(manual = false) {
 }
 document.addEventListener('visibilitychange', () => document.hidden || checkForUpdate());
 
-// ---------- Area ----------
+// ---------- Area: one row per marker, one column per round (oldest → newest) ----------
 
 function areaView(id) {
-  const a = area(id);
-  if (!a) return null;
-  const ms = markersOf(id);
-  const rounds = roundsOf(id).reverse();
-
-  const rows = ms.map((m) => {
-    const h = history(m.id);
-    const last = h.at(-1), prev = h.at(-2);
-    return `<a class="row" href="#/m/${m.id}">
-      <span class="num">${m.num}</span>
-      ${m.photoId ? `<img class="mini" src="${photoSrc(m.photoId)}" alt="">` : ''}
-      <span class="row-main"><span class="row-title">${markerName(m)}</span>
-        <span class="row-sub">${last ? fmtDate(last.round.at) : 'no readings yet'}</span></span>
-      <span class="row-end">${badge(last?.value)}${last ? trend(last.value, prev?.value) : ''}</span>
-    </a>`;
-  });
-  const roundRows = rounds.slice(0, 15).map((r) => {
-    const n = ms.filter((m) => r.values[m.id] != null).length;
-    return `<a class="row" href="#/r/${r.id}/done">
-      <span class="row-main"><span class="row-title">${fmtDateTime(r.at)}</span>
-        <span class="row-sub">${r.note ? `<span class="tag">${esc(r.note)}</span>` : 'no note'} · ${n} of ${ms.length}</span></span>
-      <span class="chev">›</span></a>`;
-  });
-
-  return {
-    title: a.name,
-    back: '/',
-    html: `
-      ${rounds.length ? `<a class="btn" href="#/a/${id}/table">📊 Trend table: all rounds</a>` : ''}
-      <h2>Markers</h2>
-      <div class="list">${rows.join('') || `<div class="empty-state">No markers yet.</div>`}</div>
-      ${roundRows.length ? `<h2>Rounds</h2><div class="list">${roundRows.join('')}</div>` : ''}
-      <a class="btn ghost" href="#/a/${id}/edit">Edit area &amp; markers</a>
-      <div class="bottom-bar">
-        ${ms.length
-          ? '<button class="btn primary big" data-act="new">+ New round</button>'
-          : `<a class="btn primary big" href="#/a/${id}/m/new">+ Add first marker</a>`}
-      </div>`,
-    mount(root) {
-      root.querySelector('[data-act=new]')?.addEventListener('click', () => {
-        const r = { id: uid(), areaId: id, at: nowLocal(), note: '', values: {} };
-        pending.set(r.id, r);
-        go(`/r/${r.id}/start`);
-      });
-    },
-  };
-}
-
-// ---------- Trend table: one row per marker, one column per round (oldest → newest) ----------
-
-function tableView(id) {
   const a = area(id);
   if (!a) return null;
   const ms = markersOf(id);
@@ -227,19 +176,33 @@ function tableView(id) {
   const sums = rounds.map((_, k) => (k === 0 ? '<td></td>' : `<td><span class="up">▲${up[k]}</span> <span class="down">▼${down[k]}</span></td>`));
 
   return {
-    title: `${a.name} · Trend`,
-    back: `/a/${id}`,
-    html: `
-      <p class="muted small">Oldest round on the left, newest on the right. <span class="trend up">▲</span> wetter / <span class="trend down">▼</span> drier than the round before. Tap a date to open that round, or a marker to see its chart.</p>
+    title: a.name,
+    back: '/',
+    html: ms.length
+      ? `
       <div class="table-scroll" id="ts"><table class="matrix">
         <thead><tr><th class="mk">Marker</th>${heads.join('')}</tr></thead>
         <tbody>${rows.join('')}</tbody>
-        <tfoot><tr class="sumrow"><th class="mk">Change</th>${sums.join('')}</tr></tfoot>
-      </table></div>`,
+        ${rounds.length > 1 ? `<tfoot><tr class="sumrow"><th class="mk">Change</th>${sums.join('')}</tr></tfoot>` : ''}
+      </table></div>
+      <p class="muted small">${rounds.length
+        ? 'Each round adds a column on the right. <span class="trend up">▲</span> wetter / <span class="trend down">▼</span> drier than the round before. Tap a date to open that round, or a marker to see its chart.'
+        : 'Tap <b>+ New round</b> to take your first readings. Each round adds a column here.'}</p>
+      <a class="btn ghost" href="#/a/${id}/edit">Edit area &amp; markers</a>
+      <div class="bottom-bar"><button class="btn primary big" data-act="new">+ New round</button></div>`
+      : `
+      <div class="empty-state">No markers yet. Add the numbered spots you measure.</div>
+      <a class="btn ghost" href="#/a/${id}/edit">Edit area</a>
+      <div class="bottom-bar"><a class="btn primary big" href="#/a/${id}/m/new">+ Add first marker</a></div>`,
     mount(root) {
       root.querySelectorAll('th[data-r]').forEach((th) => th.addEventListener('click', () => go(`/r/${th.dataset.r}/done`)));
       const ts = root.querySelector('#ts');
-      ts.scrollLeft = ts.scrollWidth; // open on the newest rounds
+      if (ts) ts.scrollLeft = ts.scrollWidth; // open on the newest rounds
+      root.querySelector('[data-act=new]')?.addEventListener('click', () => {
+        const r = { id: uid(), areaId: id, at: nowLocal(), note: '', values: {} };
+        pending.set(r.id, r);
+        go(`/r/${r.id}/start`);
+      });
     },
   };
 }

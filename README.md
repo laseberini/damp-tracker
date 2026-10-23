@@ -9,7 +9,7 @@ Everything is stored **on the phone** (IndexedDB). There is no server, account o
 - **New round**: pick the date/time and what you're testing ("pipe hose test"), then enter each marker's value on the big keypad.
   **Swipe left/right** (or Save / Skip / Back) to move between markers. A swipe also saves what you typed.
 - **▲ wetter / ▼ drier** compares each value with that marker's previous reading.
-- **Trend table**: every round (newest first) × every marker, coloured, with arrows and a ▲/▼ count per round,
+- **Area page = trend table**: one row per marker, one column per round (oldest left, newest right), coloured, with arrows and a ▲/▼ count per round,
   so you can see what each experiment did.
 - **Marker page**: chart over time with experiment notes marked, plus history. Swipe to the next marker.
   Tap a photo for full screen: pinch or double-tap to zoom, swipe between photos.

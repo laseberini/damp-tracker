@@ -6,7 +6,7 @@ import { esc, nowLocal, fmtDate, fmtDateTime, fmtVal, badge, trend, levelWord, t
 import { drawChart } from './chart.js';
 
 // Bump on every change you push. The app compares this with the live copy to update itself.
-const VERSION = 'v1.4';
+const VERSION = 'v1.5';
 
 const app = document.getElementById('app');
 const titleEl = document.getElementById('title');
@@ -14,6 +14,7 @@ const backBtn = document.getElementById('back');
 const settingsBtn = document.getElementById('settings');
 
 const pending = new Map(); // new rounds with no values yet (saved on the first value)
+const tableScroll = new Map(); // area id → table scroll position to come back to after a + add
 let slide = ''; // 'left' | 'right': animate the next screen in from that side
 let keyHandler = null;
 
@@ -156,11 +157,13 @@ function areaView(id) {
   const rounds = roundsOf(id);
   const up = rounds.map(() => 0), down = rounds.map(() => 0);
 
-  const rows = ms.map((m) => {
+  const rows = ms.map((m, mi) => {
     let prev = null; // this marker's value in the nearest column to the left
     const cells = rounds.map((r, k) => {
       const v = r.values[m.id];
-      if (v == null) return '<td class="blank">·</td>';
+      if (v == null) {
+        return `<td><button class="add-cell" data-add="${r.id}" data-i="${mi}" aria-label="Add marker ${m.num} for ${fmtDate(r.at)}">+</button></td>`;
+      }
       const d = prev == null ? null : Math.round((v - prev) * 10) / 10;
       prev = v;
       if (d > 0) up[k]++;
@@ -197,7 +200,17 @@ function areaView(id) {
     mount(root) {
       root.querySelectorAll('th[data-r]').forEach((th) => th.addEventListener('click', () => go(`/r/${th.dataset.r}/done`)));
       const ts = root.querySelector('#ts');
-      if (ts) ts.scrollLeft = ts.scrollWidth; // open on the newest rounds
+      if (ts) {
+        // Open on the newest rounds, or where you were before tapping a +.
+        ts.scrollLeft = tableScroll.get(id) ?? ts.scrollWidth;
+        tableScroll.delete(id);
+      }
+      root.querySelectorAll('[data-add]').forEach((b) =>
+        b.addEventListener('click', () => {
+          tableScroll.set(id, ts.scrollLeft);
+          go(`/r/${b.dataset.add}/add-${b.dataset.i}`);
+        }),
+      );
       root.querySelector('[data-act=new]')?.addEventListener('click', () => {
         const r = { id: uid(), areaId: id, at: nowLocal(), note: '', values: {} };
         pending.set(r.id, r);
@@ -299,9 +312,10 @@ function roundView(rid, step) {
   const ms = markersOf(a.id);
   if (step === 'start') return roundStart(r, a);
   if (step === 'done') return roundDone(r, a, ms);
-  const i = Number(step);
+  const single = step.startsWith('add-'); // filling in one missing value from the table
+  const i = Number(single ? step.slice(4) : step);
   if (!(i >= 0 && i < ms.length)) return roundDone(r, a, ms);
-  return roundEntry(r, a, ms, i);
+  return roundEntry(r, a, ms, i, single);
 }
 
 const isSaved = (r) => S.rounds.includes(r);
@@ -351,13 +365,15 @@ function roundStart(r, a) {
   };
 }
 
-function roundEntry(r, a, ms, i) {
+// single: adding one missing value from the table; Save goes straight back to it.
+function roundEntry(r, a, ms, i, single = false) {
   const m = ms[i];
   const orig = r.values[m.id];
   const before = previous(m.id, r);
   let val = orig != null ? String(orig) : '';
   const nextStep = i + 1 < ms.length ? i + 1 : 'done';
   const prevStep = i > 0 ? i - 1 : 'start';
+  const backToTable = () => (history.length > 1 ? history.back() : go(`/a/${a.id}`));
 
   return {
     title: a.name,
@@ -365,10 +381,12 @@ function roundEntry(r, a, ms, i) {
     html: `
       <div class="entry-screen" id="sw">
         <div class="round-top">
-          <span>Marker <b>${i + 1}</b> of ${ms.length} <span class="muted small">· swipe</span></span>
+          ${single
+            ? `<span>Adding to <b>${fmtDateTime(r.at)}</b></span>`
+            : `<span>Marker <b>${i + 1}</b> of ${ms.length} <span class="muted small">· swipe</span></span>`}
           ${r.note ? `<span class="tag">${esc(r.note)}</span>` : ''}
         </div>
-        <div class="progress">${ms.map((x, k) => `<span class="${k === i ? 'cur' : ''} ${r.values[x.id] != null ? 'done' : ''}"></span>`).join('')}</div>
+        ${single ? '' : `<div class="progress">${ms.map((x, k) => `<span class="${k === i ? 'cur' : ''} ${r.values[x.id] != null ? 'done' : ''}"></span>`).join('')}</div>`}
         <button class="round-photo" ${m.photoId ? '' : 'disabled'} aria-label="Zoom photo">
           ${m.photoId ? `<img src="${photoSrc(m.photoId)}" alt=""><span class="zoom-hint">Tap to zoom</span>` : '<span class="muted">No photo</span>'}
         </button>
@@ -381,11 +399,16 @@ function roundEntry(r, a, ms, i) {
         </div>
         <div class="entry"><span class="entry-val" id="val"></span><span class="entry-unit">%</span><span id="lvl"></span></div>
         <div class="keypad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((k) => `<button data-k="${k}" aria-label="${k === '⌫' ? 'Delete' : k}">${k}</button>`).join('')}</div>
-        <div class="round-actions">
+        ${single
+          ? `<div class="round-actions two-btn">
+          <button class="btn" data-act="cancel">Cancel</button>
+          <button class="btn primary" data-act="save">Save ✓</button>
+        </div>`
+          : `<div class="round-actions">
           <button class="btn" data-act="back">‹ Back</button>
           <button class="btn" data-act="skip">Skip</button>
           <button class="btn primary" data-act="save">Save ›</button>
-        </div>
+        </div>`}
       </div>`,
     mount(root) {
       const valEl = root.querySelector('#val');
@@ -433,25 +456,34 @@ function roundEntry(r, a, ms, i) {
         swap(`/r/${r.id}/${prevStep}`, 'right');
       };
       const saveAndNext = async () => {
-        if (!val && orig == null) return toast('Type the reading, or tap Skip');
+        if (!val && orig == null) return toast(single ? 'Type the reading, or tap Cancel' : 'Type the reading, or tap Skip');
         await commit();
         navigator.vibrate?.(15);
+        if (single) {
+          toast(`Marker ${m.num} added`);
+          return backToTable();
+        }
         swap(`/r/${r.id}/${nextStep}`, 'left');
       };
 
       root.querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => press(b.dataset.k)));
       root.querySelector('[data-act=save]').onclick = saveAndNext;
-      root.querySelector('[data-act=skip]').onclick = () => swap(`/r/${r.id}/${nextStep}`, 'left');
-      root.querySelector('[data-act=back]').onclick = toPrev;
       if (m.photoId) root.querySelector('.round-photo').onclick = () => zoomPhoto(m);
-      swipe(root.querySelector('#sw'), { next: toNext, prev: toPrev });
+      if (single) {
+        root.querySelector('[data-act=cancel]').onclick = backToTable;
+      } else {
+        root.querySelector('[data-act=skip]').onclick = () => swap(`/r/${r.id}/${nextStep}`, 'left');
+        root.querySelector('[data-act=back]').onclick = toPrev;
+        swipe(root.querySelector('#sw'), { next: toNext, prev: toPrev });
+      }
       keyHandler = (e) => {
         if (/^[0-9]$/.test(e.key)) press(e.key);
         else if (e.key === '.' || e.key === ',') press('.');
         else if (e.key === 'Backspace') press('⌫');
         else if (e.key === 'Enter') saveAndNext();
-        else if (e.key === 'ArrowRight') toNext();
-        else if (e.key === 'ArrowLeft') toPrev();
+        else if (e.key === 'Escape' && single) backToTable();
+        else if (e.key === 'ArrowRight' && !single) toNext();
+        else if (e.key === 'ArrowLeft' && !single) toPrev();
         else return;
         e.preventDefault();
       };
@@ -473,7 +505,7 @@ function roundDone(r, a, ms) {
       <span class="num">${m.num}</span>
       <span class="row-main"><span class="row-title">${markerName(m)}</span>
         <span class="row-sub">${p ? `was ${fmtVal(p.value)}% on ${fmtDate(p.round.at)}` : 'first reading'}</span></span>
-      <span class="row-end">${v != null ? badge(v) + trend(v, p?.value) : '<span class="muted">skipped</span>'}</span>
+      <span class="row-end">${v != null ? badge(v) + trend(v, p?.value) : '<span class="add-cell">+</span>'}</span>
     </button>`;
   });
   return {

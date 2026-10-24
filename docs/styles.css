@@ -242,6 +242,7 @@ main:has(.keypad) { padding-bottom: 12px; }
 }
 .keypad button:active { background: var(--surface-2); transform: scale(0.97); }
 .round-actions { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 8px; }
+.round-actions.two-btn { grid-template-columns: 1fr 1.6fr; }
 .round-actions .btn { min-height: 62px; font-size: 18px; padding: 0 8px; margin: 0; }
 @media (max-height: 700px) {
   .keypad button { min-height: 50px; font-size: 24px; }
@@ -298,7 +299,12 @@ input:not([type='radio']):not([type='file']), textarea {
 .matrix th.rh { vertical-align: bottom; white-space: normal; min-width: 66px; max-width: 96px; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; }
 .matrix th.rh:active { background: var(--surface-2); }
 .matrix th.rh .tag { display: block; margin-top: 4px; font-size: 11px; padding: 1px 4px; word-break: break-word; }
-.matrix td.blank { color: var(--muted); }
+.add-cell {
+  display: inline-grid; place-items: center; min-width: 46px; height: 30px; padding: 0;
+  border: 1.5px dashed var(--brand); border-radius: 6px; background: none;
+  color: var(--brand); font-size: 20px; font-weight: 700; line-height: 1;
+}
+.add-cell:active { background: var(--surface-2); }
 .matrix tfoot td, .matrix tfoot th { border-bottom: 0; font-size: 12px; font-weight: 700; }
 .cell { display: inline-flex; align-items: center; gap: 1px; min-width: 46px; justify-content: center; padding: 4px 3px; border-radius: 6px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .cell small { font-size: 10px; }

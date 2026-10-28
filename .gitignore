@@ -1,5 +1,11 @@
 # Personal photos of the house: never publish these.
 Source images/
+
+# Readings exports and backups saved here for analysis: keep them off GitHub.
+*.csv
+damp-tracker-backup-*.txt
+damp-tracker-backup-*.json
+
 node_modules/
 .wrangler/
 
